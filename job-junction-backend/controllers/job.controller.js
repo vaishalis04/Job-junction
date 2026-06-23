@@ -1,6 +1,7 @@
 const createError = require("http-errors");
 const { Op } = require("sequelize");
 const { Job, User } = require("../models/index");
+const {getDateCutoff} = require("../helpers/helperFunction");
 
 module.exports = {
   create: async (req, res, next) => {
