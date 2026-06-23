@@ -13,7 +13,13 @@ Job.init(
     responsibilities: { type: DataTypes.TEXT, allowNull: true },
     location: { type: DataTypes.STRING(150), allowNull: true },
     job_type: {
-      type: DataTypes.ENUM("full_time", "part_time", "contract", "internship", "remote"),
+      type: DataTypes.ENUM(
+        "full_time",
+        "part_time",
+        "contract",
+        "internship",
+        "remote",
+      ),
       allowNull: false,
     },
     experience_level: {
@@ -23,7 +29,11 @@ Job.init(
     salary_min: { type: DataTypes.INTEGER, allowNull: true },
     salary_max: { type: DataTypes.INTEGER, allowNull: true },
     salary_currency: { type: DataTypes.STRING(10), defaultValue: "INR" },
-    skills_required: { type: DataTypes.JSON, allowNull: true, defaultValue: [] },
+    skills_required: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      defaultValue: [],
+    },
     category: { type: DataTypes.STRING(100), allowNull: true },
     vacancies: { type: DataTypes.INTEGER, defaultValue: 1 },
     application_deadline: { type: DataTypes.DATEONLY, allowNull: true },
@@ -33,6 +43,34 @@ Job.init(
     },
     views: { type: DataTypes.INTEGER, defaultValue: 0 },
     is_inactive: { type: DataTypes.BOOLEAN, defaultValue: false },
+    department: {
+      type: DataTypes.ENUM(
+        "engineering_software_qa",
+        "sales_business_development",
+        "finance_accounting",
+        "human_resources",
+        "marketing",
+        "operations",
+        "design_creative",
+        "customer_support",
+      ),
+      allowNull: true,
+    },
+    nature_of_business: {
+      type: DataTypes.ENUM("b2b", "b2c", "b2b_b2c", "d2c"),
+      allowNull: true,
+    },
+    experience_level: {
+      type: DataTypes.ENUM(
+        "fresher",
+        "junior",
+        "mid",
+        "senior",
+        "lead",
+        "manager",
+      ),
+      allowNull: true,
+    },
   },
   {
     sequelize,
@@ -40,7 +78,7 @@ Job.init(
     tableName: "jobs",
     timestamps: true,
     underscored: true,
-  }
+  },
 );
 
 module.exports = Job;

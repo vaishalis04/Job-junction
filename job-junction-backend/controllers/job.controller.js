@@ -16,32 +16,99 @@ module.exports = {
     }
   },
 
+
   getAll: async (req, res, next) => {
     try {
-      const { search, location, job_type, experience_level, category, page = 1, limit = 10 } = req.query;
+      const {
+        // search
+        search,
+        // filters
+        job_type,
+        department,
+        experience_level,
+        nature_of_business,
+        date_posted,
+        location,
+        // sort
+        sort_by = "latest",
+        // pagination
+        page  = 1,
+        limit = 10,
+      } = req.query;
+
       const where = { status: "active", is_inactive: false };
 
-      if (location)         where.location         = { [Op.like]: `%${location}%` };
-      if (job_type)         where.job_type         = job_type;
-      if (experience_level) where.experience_level = experience_level;
-      if (category)         where.category         = { [Op.like]: `%${category}%` };
       if (search) {
         where[Op.or] = [
           { title:       { [Op.like]: `%${search}%` } },
           { description: { [Op.like]: `%${search}%` } },
+          { location:    { [Op.like]: `%${search}%` } },
         ];
       }
 
-      const offset = (Number(page) - 1) * Number(limit);
+
+      if (job_type) {
+        const types = job_type.split(",").map((t) => t.trim()).filter(Boolean);
+        where.job_type = types.length === 1 ? types[0] : { [Op.in]: types };
+      }
+
+      if (department) {
+        const depts = department.split(",").map((d) => d.trim()).filter(Boolean);
+        where.department = depts.length === 1 ? depts[0] : { [Op.in]: depts };
+      }
+
+      if (experience_level) {
+        const levels = experience_level.split(",").map((l) => l.trim()).filter(Boolean);
+        where.experience_level = levels.length === 1 ? levels[0] : { [Op.in]: levels };
+      }
+
+      if (nature_of_business) {
+        const nobs = nature_of_business.split(",").map((n) => n.trim()).filter(Boolean);
+        where.nature_of_business = nobs.length === 1 ? nobs[0] : { [Op.in]: nobs };
+      }
+
+      if (location) {
+        where.location = { [Op.like]: `%${location}%` };
+      }
+
+      const cutoff = getDateCutoff(date_posted);
+      if (cutoff) {
+        where.created_at = { [Op.gte]: cutoff };
+      }
+
+      const sortMap = {
+        latest:      [["created_at", "DESC"]],
+        oldest:      [["created_at", "ASC"]],
+        salary_high: [["salary_max", "DESC"]],
+        salary_low:  [["salary_min", "ASC"]],
+        most_viewed: [["views", "DESC"]],
+      };
+      const order = sortMap[sort_by] || sortMap.latest;
+
+      const pageNum  = Math.max(1, Number(page));
+      const limitNum = Math.min(50, Math.max(1, Number(limit))); // cap at 50
+      const offset   = (pageNum - 1) * limitNum;
+
       const { count, rows: jobs } = await Job.findAndCountAll({
         where,
-        order: [["created_at", "DESC"]],
-        limit: Number(limit),
+        order,
+        limit:  limitNum,
         offset,
         include: [{ model: User, as: "employer", attributes: ["id", "name"] }],
       });
 
-      res.json({ success: true, total: count, page: Number(page), limit: Number(limit), jobs });
+      const totalPages = Math.ceil(count / limitNum);
+
+      res.json({
+        success: true,
+        total:       count,
+        page:        pageNum,
+        limit:       limitNum,
+        total_pages: totalPages,
+        has_next:    pageNum < totalPages,
+        has_prev:    pageNum > 1,
+        jobs,
+      });
     } catch (err) {
       next(err);
     }
@@ -63,11 +130,48 @@ module.exports = {
 
   getMyJobs: async (req, res, next) => {
     try {
-      const jobs = await Job.findAll({
-        where: { employer_id: req.userId, is_inactive: false },
-        order: [["created_at", "DESC"]],
+      const {
+        search,
+        status,
+        sort_by = "latest",
+        page    = 1,
+        limit   = 10,
+      } = req.query;
+
+      const where = { employer_id: req.userId, is_inactive: false };
+      if (status) where.status = status;
+      if (search) {
+        where[Op.or] = [
+          { title:    { [Op.like]: `%${search}%` } },
+          { location: { [Op.like]: `%${search}%` } },
+        ];
+      }
+
+      const sortMap = {
+        latest:      [["created_at", "DESC"]],
+        oldest:      [["created_at", "ASC"]],
+        most_viewed: [["views", "DESC"]],
+      };
+      const order    = sortMap[sort_by] || sortMap.latest;
+      const pageNum  = Math.max(1, Number(page));
+      const limitNum = Math.min(50, Math.max(1, Number(limit)));
+      const offset   = (pageNum - 1) * limitNum;
+
+      const { count, rows: jobs } = await Job.findAndCountAll({
+        where,
+        order,
+        limit: limitNum,
+        offset,
       });
-      res.json({ success: true, total: jobs.length, jobs });
+
+      res.json({
+        success:     true,
+        total:       count,
+        page:        pageNum,
+        limit:       limitNum,
+        total_pages: Math.ceil(count / limitNum),
+        jobs,
+      });
     } catch (err) {
       next(err);
     }
