@@ -198,123 +198,207 @@ searchSeekers: async (req, res, next) => {
       gender,
       location,
       job_type_preference,
+      skill,
+      language,
+      degree,
+      institute,
+      company,
+      title,
       completeness_tier,
       is_available,
       min_score,
       max_score,
       min_salary,
       max_salary,
-      skill,
-      language,
       sort_by = "score_high",
-      page  = 1,
+      page = 1,
       limit = 10,
     } = req.query;
 
-    const where = { is_inactive: false };
+    const where = {
+      is_inactive: false,
+    };
 
+    const andConditions = [];
+
+    // Basic Search
     if (search) {
       where[Op.or] = [
         { headline: { [Op.like]: `%${search}%` } },
         { location: { [Op.like]: `%${search}%` } },
+        { "$user.name$": { [Op.like]: `%${search}%` } },
+        { "$user.email$": { [Op.like]: `%${search}%` } },
       ];
     }
 
+    // Gender
     if (gender) {
-      const genders = gender.split(",").map((g) => g.trim()).filter(Boolean);
-      where.gender = genders.length === 1 ? genders[0] : { [Op.in]: genders };
+      const genders = gender.split(",").map(x => x.trim());
+
+      where.gender =
+        genders.length === 1
+          ? genders[0]
+          : {
+              [Op.in]: genders,
+            };
     }
 
+    // Location
     if (location) {
-      where.location = { [Op.like]: `%${location}%` };
+      where.location = {
+        [Op.like]: `%${location}%`,
+      };
     }
 
-    if (completeness_tier) {
-      const tiers = completeness_tier.split(",").map((t) => t.trim()).filter(Boolean);
-      where.completeness_tier = tiers.length === 1 ? tiers[0] : { [Op.in]: tiers };
-    }
-
+    // Availability
     if (is_available !== undefined) {
       where.is_available = is_available === "true";
     }
 
+    // Tier
+    if (completeness_tier) {
+      const tiers = completeness_tier.split(",").map(x => x.trim());
+
+      where.completeness_tier =
+        tiers.length === 1
+          ? tiers[0]
+          : {
+              [Op.in]: tiers,
+            };
+    }
+
+    // Score
     if (min_score || max_score) {
       where.completeness_score = {};
-      if (min_score) where.completeness_score[Op.gte] = Number(min_score);
-      if (max_score) where.completeness_score[Op.lte] = Number(max_score);
+
+      if (min_score)
+        where.completeness_score[Op.gte] = Number(min_score);
+
+      if (max_score)
+        where.completeness_score[Op.lte] = Number(max_score);
     }
 
+    // Salary
     if (min_salary || max_salary) {
       where.expected_salary = {};
-      if (min_salary) where.expected_salary[Op.gte] = Number(min_salary);
-      if (max_salary) where.expected_salary[Op.lte] = Number(max_salary);
+
+      if (min_salary)
+        where.expected_salary[Op.gte] = Number(min_salary);
+
+      if (max_salary)
+        where.expected_salary[Op.lte] = Number(max_salary);
     }
 
+    // Skills (JSON Array)
     if (skill) {
-      where[Op.and] = where[Op.and] || [];
-      where[Op.and].push(
-        sequelize.literal(
-          `JSON_SEARCH(LOWER(skills), 'one', '%${skill.toLowerCase()}%') IS NOT NULL`
+      andConditions.push(
+        Sequelize.literal(
+          `JSON_SEARCH(skills,'one','%${skill}%') IS NOT NULL`
         )
       );
     }
 
+    // Languages (JSON Array)
     if (language) {
-      where[Op.and] = where[Op.and] || [];
-      where[Op.and].push(
-        sequelize.literal(
-          `JSON_SEARCH(LOWER(languages), 'one', '%${language.toLowerCase()}%') IS NOT NULL`
+      andConditions.push(
+        Sequelize.literal(
+          `JSON_SEARCH(languages,'one','%${language}%') IS NOT NULL`
         )
       );
     }
 
+    // Job Preference (JSON Array)
     if (job_type_preference) {
-      const prefs = job_type_preference.split(",").map((j) => j.trim().toLowerCase());
-      where[Op.and] = where[Op.and] || [];
-      prefs.forEach((pref) => {
-        where[Op.and].push(
-          sequelize.literal(
-            `JSON_SEARCH(LOWER(job_type_preference), 'one', '${pref}') IS NOT NULL`
-          )
-        );
-      });
+      job_type_preference
+        .split(",")
+        .map(x => x.trim())
+        .forEach(pref => {
+          andConditions.push(
+            Sequelize.literal(
+              `JSON_SEARCH(job_type_preference,'one','${pref}') IS NOT NULL`
+            )
+          );
+        });
+    }
+
+    // Education Degree
+    if (degree) {
+      andConditions.push(
+        Sequelize.literal(
+          `JSON_SEARCH(education,'one','%${degree}%',NULL,'$[*].degree') IS NOT NULL`
+        )
+      );
+    }
+
+    // Education Institute
+    if (institute) {
+      andConditions.push(
+        Sequelize.literal(
+          `JSON_SEARCH(education,'one','%${institute}%',NULL,'$[*].institution') IS NOT NULL`
+        )
+      );
+    }
+
+    // Experience Company
+    if (company) {
+      andConditions.push(
+        Sequelize.literal(
+          `JSON_SEARCH(experience,'one','%${company}%',NULL,'$[*].company') IS NOT NULL`
+        )
+      );
+    }
+
+    // Experience Title
+    if (title) {
+      andConditions.push(
+        Sequelize.literal(
+          `JSON_SEARCH(experience,'one','%${title}%',NULL,'$[*].title') IS NOT NULL`
+        )
+      );
+    }
+
+    if (andConditions.length) {
+      where[Op.and] = andConditions;
     }
 
     const sortMap = {
-      score_high:  [["completeness_score", "DESC"]],
-      score_low:   [["completeness_score", "ASC"]],
+      score_high: [["completeness_score", "DESC"]],
+      score_low: [["completeness_score", "ASC"]],
       salary_high: [["expected_salary", "DESC"]],
-      salary_low:  [["expected_salary", "ASC"]],
-      latest:      [["created_at", "DESC"]],
-      oldest:      [["created_at", "ASC"]],
+      salary_low: [["expected_salary", "ASC"]],
+      latest: [["created_at", "DESC"]],
+      oldest: [["created_at", "ASC"]],
     };
-    const order = sortMap[sort_by] || sortMap.score_high;
 
-    const pageNum  = Math.max(1, Number(page));
-    const limitNum = Math.min(50, Math.max(1, Number(limit)));
-    const offset   = (pageNum - 1) * limitNum;
+    const pageNum = Math.max(1, Number(page));
+    const limitNum = Math.min(50, Number(limit));
+    const offset = (pageNum - 1) * limitNum;
 
-    const { count, rows: profiles } = await JobSeekerProfile.findAndCountAll({
+    const { count, rows } = await JobSeekerProfile.findAndCountAll({
       where,
-      order,
-      limit:    limitNum,
+      attributes: {
+        exclude: ["resume"],
+      },
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["id", "name", "email", "mobile"],
+        },
+      ],
+      order: sortMap[sort_by] || sortMap.score_high,
+      limit: limitNum,
       offset,
       distinct: true,
-      attributes: { exclude: ["resume"] },
-      include: [{
-        model: User,
-        as: "user",
-        attributes: ["id", "name", "email", "mobile"],
-      }],
     });
 
     res.json({
-      success:     true,
-      total:       count,
-      page:        pageNum,
-      limit:       limitNum,
+      success: true,
+      total: count,
+      page: pageNum,
+      limit: limitNum,
       total_pages: Math.ceil(count / limitNum),
-      profiles,
+      profiles: rows,
     });
   } catch (err) {
     next(err);
