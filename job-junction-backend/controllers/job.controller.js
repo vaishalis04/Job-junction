@@ -1,6 +1,6 @@
 const createError = require("http-errors");
 const { Op } = require("sequelize");
-const { Job, User } = require("../models/index");
+const { Job, User, SavedJob } = require("../models/index");
 const {getDateCutoff} = require("../helpers/helperFunction");
 
 module.exports = {
@@ -199,4 +199,26 @@ module.exports = {
       next(err);
     }
   },
+
+  repost: async (req, res, next) => {
+  try {
+    const original = await Job.findOne({
+      where: { id: req.params.id, employer_id: req.userId, is_inactive: false },
+    });
+    if (!original) throw createError.NotFound("Job not found or not authorized");
+
+    const { id, created_at, updated_at, views, ...jobData } = original.toJSON();
+
+    const reposted = await Job.create({
+      ...jobData,
+      status:               "active",
+      views:                0,
+      application_deadline: req.body.application_deadline || null, 
+    });
+
+    res.status(201).json({ success: true, msg: "Job reposted successfully", job: reposted });
+  } catch (err) {
+    next(err);
+  }
+},
 };

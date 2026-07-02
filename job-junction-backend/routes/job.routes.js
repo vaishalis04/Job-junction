@@ -13,5 +13,7 @@ router.post("/",           Controller.create);
 router.get("/me/my-jobs",  Controller.getMyJobs);
 router.put("/:id",         Controller.update);
 router.delete("/:id",      Controller.delete);
+router.post("/:id/repost", Controller.repost);
+
 
 module.exports = router;
