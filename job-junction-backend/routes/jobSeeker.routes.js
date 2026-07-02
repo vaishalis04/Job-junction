@@ -16,4 +16,9 @@ router.put("/me/profile",    authorize("job_seeker"), upload.fields([{ name: "pr
 router.put("/me/education",  authorize("job_seeker"), Controller.updateEducation);
 router.put("/me/experience", authorize("job_seeker"), Controller.updateExperience);
 
+// Saved jobs — job_seeker only
+router.post("/saved-jobs/:jobId/toggle", authorize("job_seeker"), Controller.toggleSaveJob);
+router.get("/saved-jobs",                authorize("job_seeker"), Controller.getSavedJobs);
+router.get("/saved-jobs/:jobId/status",  authorize("job_seeker"), Controller.isJobSaved);
+
 module.exports = router;

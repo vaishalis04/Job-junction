@@ -1,6 +1,6 @@
 const createError = require("http-errors");
 const { Op } = require("sequelize");
-const { JobSeekerProfile, User } = require("../models/index");
+const { JobSeekerProfile, User,SavedJob, Job  } = require("../models/index");
 
 module.exports = {
   upsertProfile: async (req, res, next) => {
@@ -93,7 +93,6 @@ module.exports = {
         include: [{ model: User, as: "user", attributes: ["name", "email", "mobile"] }],
       });
 
-      // Filter by skill (JSON array contains)
       if (skill) {
         const s = skill.toLowerCase();
         profiles = profiles.filter((p) => {
@@ -107,4 +106,79 @@ module.exports = {
       next(err);
     }
   },
+
+toggleSaveJob: async (req, res, next) => {
+  try {
+    const { jobId } = req.params;
+
+    const job = await Job.findOne({ where: { id: jobId, is_inactive: false } });
+    if (!job) throw createError.NotFound("Job not found");
+
+    const existing = await SavedJob.findOne({
+      where: { user_id: req.userId, job_id: jobId },
+    });
+
+    if (existing) {
+      await existing.destroy();
+      return res.json({ success: true, saved: false, msg: "Job removed from saved" });
+    }
+
+    await SavedJob.create({ user_id: req.userId, job_id: jobId });
+    res.json({ success: true, saved: true, msg: "Job saved successfully" });
+  } catch (err) {
+    next(err);
+  }
+},
+
+getSavedJobs: async (req, res, next) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    const pageNum  = Math.max(1, Number(page));
+    const limitNum = Math.min(50, Math.max(1, Number(limit)));
+    const offset   = (pageNum - 1) * limitNum;
+
+    const { count, rows: savedJobs } = await SavedJob.findAndCountAll({
+      where: { user_id: req.userId },
+      order: [["created_at", "DESC"]],
+      limit:  limitNum,
+      offset,
+      include: [
+        {
+          model: Job,
+          as: "job",
+          where: { is_inactive: false },  
+          attributes: [
+            "id", "title", "location", "job_type",
+            "experience_level", "salary_min", "salary_max",
+            "department", "status", "application_deadline", "created_at",
+          ],
+          include: [{ model: User, as: "employer", attributes: ["id", "name"] }],
+        },
+      ],
+    });
+
+    res.json({
+      success:     true,
+      total:       count,
+      page:        pageNum,
+      limit:       limitNum,
+      total_pages: Math.ceil(count / limitNum),
+      saved_jobs:  savedJobs,
+    });
+  } catch (err) {
+    next(err);
+  }
+},
+
+isJobSaved: async (req, res, next) => {
+  try {
+    const { jobId } = req.params;
+    const saved = await SavedJob.findOne({
+      where: { user_id: req.userId, job_id: jobId },
+    });
+    res.json({ success: true, saved: !!saved });
+  } catch (err) {
+    next(err);
+  }
+},
 };
