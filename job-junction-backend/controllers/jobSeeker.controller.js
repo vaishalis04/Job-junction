@@ -221,7 +221,6 @@ searchSeekers: async (req, res, next) => {
 
     const andConditions = [];
 
-    // Basic Search
     if (search) {
       where[Op.or] = [
         { headline: { [Op.like]: `%${search}%` } },
@@ -231,7 +230,6 @@ searchSeekers: async (req, res, next) => {
       ];
     }
 
-    // Gender
     if (gender) {
       const genders = gender.split(",").map(x => x.trim());
 
@@ -243,19 +241,16 @@ searchSeekers: async (req, res, next) => {
             };
     }
 
-    // Location
     if (location) {
       where.location = {
         [Op.like]: `%${location}%`,
       };
     }
 
-    // Availability
     if (is_available !== undefined) {
       where.is_available = is_available === "true";
     }
 
-    // Tier
     if (completeness_tier) {
       const tiers = completeness_tier.split(",").map(x => x.trim());
 
@@ -267,7 +262,6 @@ searchSeekers: async (req, res, next) => {
             };
     }
 
-    // Score
     if (min_score || max_score) {
       where.completeness_score = {};
 
@@ -278,7 +272,6 @@ searchSeekers: async (req, res, next) => {
         where.completeness_score[Op.lte] = Number(max_score);
     }
 
-    // Salary
     if (min_salary || max_salary) {
       where.expected_salary = {};
 
@@ -289,25 +282,22 @@ searchSeekers: async (req, res, next) => {
         where.expected_salary[Op.lte] = Number(max_salary);
     }
 
-    // Skills (JSON Array)
-    if (skill) {
+    if (skills) {
       andConditions.push(
         Sequelize.literal(
-          `JSON_SEARCH(skills,'one','%${skill}%') IS NOT NULL`
+          `JSON_SEARCH(skills,'one','%${skills}%') IS NOT NULL`
         )
       );
     }
 
-    // Languages (JSON Array)
-    if (language) {
+    if (languages) {
       andConditions.push(
         Sequelize.literal(
-          `JSON_SEARCH(languages,'one','%${language}%') IS NOT NULL`
+          `JSON_SEARCH(languages,'one','%${languages}%') IS NOT NULL`
         )
       );
     }
 
-    // Job Preference (JSON Array)
     if (job_type_preference) {
       job_type_preference
         .split(",")
@@ -321,7 +311,6 @@ searchSeekers: async (req, res, next) => {
         });
     }
 
-    // Education Degree
     if (degree) {
       andConditions.push(
         Sequelize.literal(
@@ -330,7 +319,6 @@ searchSeekers: async (req, res, next) => {
       );
     }
 
-    // Education Institute
     if (institute) {
       andConditions.push(
         Sequelize.literal(
@@ -339,7 +327,6 @@ searchSeekers: async (req, res, next) => {
       );
     }
 
-    // Experience Company
     if (company) {
       andConditions.push(
         Sequelize.literal(
@@ -348,7 +335,6 @@ searchSeekers: async (req, res, next) => {
       );
     }
 
-    // Experience Title
     if (title) {
       andConditions.push(
         Sequelize.literal(
