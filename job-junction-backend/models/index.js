@@ -38,4 +38,4 @@ SavedJob.belongsTo(User, { foreignKey: "user_id", as: "user" });
 Job.hasMany(SavedJob, { foreignKey: "job_id", as: "savedByUsers" });
 SavedJob.belongsTo(Job, { foreignKey: "job_id", as: "job" });
 
-module.exports = { sequelize, User, JobSeekerProfile, EmployerProfile, Job, Application };
+module.exports = { sequelize, User, JobSeekerProfile, EmployerProfile, Job, Application, SavedJob};
