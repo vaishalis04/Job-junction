@@ -131,6 +131,7 @@ toggleSaveJob: async (req, res, next) => {
 },
 
 getSavedJobs: async (req, res, next) => {
+  console.log("Inside getSavedJobs");
   try {
     const { page = 1, limit = 10 } = req.query;
     const pageNum  = Math.max(1, Number(page));
