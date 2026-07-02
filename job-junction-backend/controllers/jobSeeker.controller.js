@@ -146,15 +146,22 @@ getSavedJobs: async (req, res, next) => {
         {
           model: Job,
           as: "job",
-          where: { is_inactive: false },  
+          required: true,                  
+          where: { is_inactive: false },
           attributes: [
             "id", "title", "location", "job_type",
             "experience_level", "salary_min", "salary_max",
             "department", "status", "application_deadline", "created_at",
           ],
-          include: [{ model: User, as: "employer", attributes: ["id", "name"] }],
+          include: [{ 
+            model: User, 
+            as: "employer", 
+            attributes: ["id", "name"],
+            required: false,                
+          }],
         },
       ],
+      distinct: true,                       
     });
 
     res.json({
