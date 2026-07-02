@@ -6,10 +6,10 @@ const upload = require("../helpers/multer.helper");
 
 // Public
 router.get("/ranked",     Controller.getRankedProfiles);
-router.get("/search", authorize("employer"), Controller.searchSeekers);
 
 // Protected
 router.use(verifyAccessToken, attachUser);
+router.get("/search",        authorize("employer"), Controller.searchSeekers);
 router.get("/me/profile",    authorize("job_seeker"), Controller.getMyProfile);
 router.post("/me/profile",   authorize("job_seeker"), upload.fields([{ name: "profile_picture", maxCount: 1 }, { name: "resume", maxCount: 1 }]), Controller.upsertProfile);
 router.put("/me/profile",    authorize("job_seeker"), upload.fields([{ name: "profile_picture", maxCount: 1 }, { name: "resume", maxCount: 1 }]), Controller.upsertProfile);
