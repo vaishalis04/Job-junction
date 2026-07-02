@@ -189,4 +189,138 @@ isJobSaved: async (req, res, next) => {
     next(err);
   }
 },
+
+searchSeekers: async (req, res, next) => {
+  try {
+    const {
+      // search
+      search,
+      // filters
+      gender,
+      location,
+      job_type_preference,
+      completeness_tier,
+      is_available,
+      min_score,
+      max_score,
+      min_salary,
+      max_salary,
+      skill,
+      language,
+      // sort
+      sort_by = "score_high",
+      // pagination
+      page  = 1,
+      limit = 10,
+    } = req.query;
+
+    const where = { is_inactive: false };
+
+    // ── Search ────────────────────────────────────────────────────────────────
+    if (search) {
+      where[Op.or] = [
+        { headline: { [Op.like]: `%${search}%` } },
+        { location: { [Op.like]: `%${search}%` } },
+      ];
+    }
+
+    // ── Filters ───────────────────────────────────────────────────────────────
+    if (gender) {
+      const genders = gender.split(",").map((g) => g.trim()).filter(Boolean);
+      where.gender = genders.length === 1 ? genders[0] : { [Op.in]: genders };
+    }
+
+    if (location) {
+      where.location = { [Op.like]: `%${location}%` };
+    }
+
+    if (completeness_tier) {
+      const tiers = completeness_tier.split(",").map((t) => t.trim()).filter(Boolean);
+      where.completeness_tier = tiers.length === 1 ? tiers[0] : { [Op.in]: tiers };
+    }
+
+    if (is_available !== undefined) {
+      where.is_available = is_available === "true";
+    }
+
+    // Completeness score range
+    if (min_score || max_score) {
+      where.completeness_score = {};
+      if (min_score) where.completeness_score[Op.gte] = Number(min_score);
+      if (max_score) where.completeness_score[Op.lte] = Number(max_score);
+    }
+
+    // Expected salary range
+    if (min_salary || max_salary) {
+      where.expected_salary = {};
+      if (min_salary) where.expected_salary[Op.gte] = Number(min_salary);
+      if (max_salary) where.expected_salary[Op.lte] = Number(max_salary);
+    }
+
+    // ── Sort ──────────────────────────────────────────────────────────────────
+    const sortMap = {
+      score_high:  [["completeness_score", "DESC"]],
+      score_low:   [["completeness_score", "ASC"]],
+      salary_high: [["expected_salary", "DESC"]],
+      salary_low:  [["expected_salary", "ASC"]],
+      latest:      [["created_at", "DESC"]],
+      oldest:      [["created_at", "ASC"]],
+    };
+    const order = sortMap[sort_by] || sortMap.score_high;
+
+    // ── Pagination ────────────────────────────────────────────────────────────
+    const pageNum  = Math.max(1, Number(page));
+    const limitNum = Math.min(50, Math.max(1, Number(limit)));
+    const offset   = (pageNum - 1) * limitNum;
+
+    // ── Query ─────────────────────────────────────────────────────────────────
+    let { count, rows: profiles } = await JobSeekerProfile.findAndCountAll({
+      where,
+      order,
+      limit:    limitNum,
+      offset,
+      distinct: true,
+      attributes: { exclude: ["resume"] }, // exclude resume path from list view
+      include: [{ 
+        model: User, 
+        as: "user", 
+        attributes: ["id", "name", "email", "mobile"] 
+      }],
+    });
+
+    // ── Post-query JSON filters (skill, language, job_type_preference) ────────
+    // These are stored as JSON arrays in MySQL so filtered in JS after query
+    if (skill) {
+      const s = skill.toLowerCase();
+      profiles = profiles.filter((p) =>
+        (p.skills || []).some((sk) => sk.toLowerCase().includes(s))
+      );
+    }
+
+    if (language) {
+      const l = language.toLowerCase();
+      profiles = profiles.filter((p) =>
+        (p.languages || []).some((lang) => lang.toLowerCase().includes(l))
+      );
+    }
+
+    if (job_type_preference) {
+      const prefs = job_type_preference.split(",").map((j) => j.trim().toLowerCase());
+      profiles = profiles.filter((p) =>
+        (p.job_type_preference || []).some((j) => prefs.includes(j.toLowerCase()))
+      );
+    }
+
+    res.json({
+      success:     true,
+      total:       count,
+      page:        pageNum,
+      limit:       limitNum,
+      total_pages: Math.ceil(count / limitNum),
+      profiles,
+    });
+  } catch (err) {
+    next(err);
+  }
+},
 };
