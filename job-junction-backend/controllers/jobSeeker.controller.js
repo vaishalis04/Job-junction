@@ -1,7 +1,7 @@
 const createError = require("http-errors");
 const { Op } = require("sequelize");
-const { JobSeekerProfile, User,SavedJob, Job  } = require("../models/index");
-const { sequelize } = require("../models/index");
+const { JobSeekerProfile, User,SavedJob, Job, sequelize  } = require("../models/index");
+
 
 module.exports = {
   upsertProfile: async (req, res, next) => {
@@ -211,7 +211,6 @@ searchSeekers: async (req, res, next) => {
       limit = 10,
     } = req.query;
 
-    const { sequelize } = require("../models/index");
     const where = { is_inactive: false };
 
     if (search) {
@@ -254,13 +253,8 @@ searchSeekers: async (req, res, next) => {
     if (skill) {
       where[Op.and] = where[Op.and] || [];
       where[Op.and].push(
-        sequelize.where(
-          sequelize.fn("JSON_SEARCH",
-            sequelize.fn("LOWER", sequelize.col("skills")),
-            "one",
-            `%${skill.toLowerCase()}%`
-          ),
-          { [Op.ne]: null }
+        sequelize.literal(
+          `JSON_SEARCH(LOWER(skills), 'one', '%${skill.toLowerCase()}%') IS NOT NULL`
         )
       );
     }
@@ -268,13 +262,8 @@ searchSeekers: async (req, res, next) => {
     if (language) {
       where[Op.and] = where[Op.and] || [];
       where[Op.and].push(
-        sequelize.where(
-          sequelize.fn("JSON_SEARCH",
-            sequelize.fn("LOWER", sequelize.col("languages")),
-            "one",
-            `%${language.toLowerCase()}%`
-          ),
-          { [Op.ne]: null }
+        sequelize.literal(
+          `JSON_SEARCH(LOWER(languages), 'one', '%${language.toLowerCase()}%') IS NOT NULL`
         )
       );
     }
@@ -284,13 +273,8 @@ searchSeekers: async (req, res, next) => {
       where[Op.and] = where[Op.and] || [];
       prefs.forEach((pref) => {
         where[Op.and].push(
-          sequelize.where(
-            sequelize.fn("JSON_SEARCH",
-              sequelize.fn("LOWER", sequelize.col("job_type_preference")),
-              "one",
-              pref
-            ),
-            { [Op.ne]: null }
+          sequelize.literal(
+            `JSON_SEARCH(LOWER(job_type_preference), 'one', '${pref}') IS NOT NULL`
           )
         );
       });
